@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PPE Safety Compliance Detector</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f4f4f9; color: #333; }
+        .container { max-width: 650px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        input[type="file"] { margin: 15px 0; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 15px; }
+        button:hover { background: #0056b3; }
+        .status-box { margin-top: 20px; padding: 15px; border-radius: 6px; font-weight: bold; display: none; }
+        .safe { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .unsafe { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .details { margin-top: 15px; line-height: 1.6; }
+        img { max-width: 100%; margin-top: 20px; border-radius: 6px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>PPE Safety Compliance Detector</h2>
+        <p>Upload a photo to verify if required safety gear is worn:</p>
+        <input type="file" id="imageInput" accept="image/*"><br>
+        <button onclick="uploadImage()">Check Compliance</button>
+
+        <div id="statusBox" class="status-box"></div>
+        <div id="details" class="details"></div>
+        <img id="previewImage" alt="Annotated Result">
+    </div>
+
+    <script>
+        async function uploadImage() {
+            const fileInput = document.getElementById('imageInput');
+            const statusBox = document.getElementById('statusBox');
+            const details = document.getElementById('details');
+            const previewImage = document.getElementById('previewImage');
+
+            if (fileInput.files.length === 0) {
+                alert("Please select an image first!");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            statusBox.style.display = "block";
+            statusBox.className = "status-box";
+            statusBox.textContent = "Analyzing safety gear...";
+            details.innerHTML = "";
+            previewImage.style.display = "none";
+
+            try {
+                const response = await fetch('/detect', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                statusBox.className = data.compliant ? "status-box safe" : "status-box unsafe";
+                statusBox.textContent = data.status_message;
+
+                const detectedText = data.detected_gears?.length ? data.detected_gears.join(", ") : "None";
+                const missingText = data.missing_gears?.length ? data.missing_gears.join(", ") : "None";
+                const explicitText = data.explicitly_missing?.length ? data.explicitly_missing.join(", ") : "None";
+
+                details.innerHTML = `
+                    <p><strong>Detected Gears:</strong> ${detectedText}</p>
+                    <p><strong>Missing / Required Gears:</strong> ${missingText}</p>
+                    <p><strong>Explicitly Flagged Missing (no-*):</strong> ${explicitText}</p>
+                `;
+
+                if (data.annotated_image_base64) {
+                    previewImage.src = "data:image/jpeg;base64," + data.annotated_image_base64;
+                    previewImage.style.display = "block";
+                }
+            } catch (error) {
+                statusBox.className = "status-box unsafe";
+                statusBox.textContent = "Error connecting to server: " + error;
+            }
+        }
+    </script>
+</body>
+</html>
